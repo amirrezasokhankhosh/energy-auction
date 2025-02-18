@@ -35,18 +35,18 @@ class AuctionControl extends Contract {
 		for (const resource of resources) {
 			await ctx.stub.putState(
 				resource.id,
-				Buffer(stringify(sortKeysRecursive(resource)))
+				Buffer.from(stringify(sortKeysRecursive(resource)))
 			);
 		}
 	}
 
-	async ResourceExists(ctx, id) {
-		const resourceBytes = await ctx.stub.getState(id);
-		return resourceBytes && resourceBytes.length > 0;
+	async KeyExists(ctx, id) {
+		const valueBytes = await ctx.stub.getState(id);
+		return valueBytes && valueBytes.length > 0;
 	}
 
 	async CreateResource(ctx, id, volume, price, type) {
-		const exists = await this.ResourceExists(ctx, id);
+		const exists = await this.KeyExists(ctx, id);
 		if (exists) {
 			throw Error(`A resource already exists with id: ${id}`);
 		}
@@ -56,25 +56,27 @@ class AuctionControl extends Contract {
 			volume: parseFloat(volume),
 			price: parseFloat(price),
 			type: type,
+			buyer_bid_id: null,
+			sold_price: null,
 		};
 
 		await ctx.stub.putState(
 			resource.id,
-			Buffer(stringify(sortKeysRecursive(resource)))
+			Buffer.from(stringify(sortKeysRecursive(resource)))
 		);
 		return JSON.stringify(resource);
 	}
 
-	async ReadResource(ctx, id) {
-		const resourceBytes = await ctx.stub.getState(id);
-		if (!resourceBytes || resourceBytes.length === 0) {
-			throw Error(`No resource exists with id: ${id}`);
+	async ReadKey(ctx, id) {
+		const valueBytes = await ctx.stub.getState(id);
+		if (!valueBytes || valueBytes.length === 0) {
+			throw Error(`No value exists for key: ${id}`);
 		}
 
-		return resourceBytes.toString();
+		return valueBytes.toString();
 	}
 
-	async GetAllResources(ctx) {
+	async GetAllValues(ctx, value_type) {
 		const allResults = [];
 		const iterator = await ctx.stub.getStateByRange("", "");
 		let result = await iterator.next();
@@ -89,7 +91,7 @@ class AuctionControl extends Contract {
 				console.log(err);
 				record = strValue;
 			}
-			if (record.id.startsWith("resource_")) {
+			if (record.id.startsWith(`${value_type}_`)) {
 				allResults.push(record);
 			}
 			result = await iterator.next();
@@ -98,7 +100,7 @@ class AuctionControl extends Contract {
 	}
 
 	async SortResources(ctx) {
-		const resourcesString = await this.GetAllResources(ctx);
+		const resourcesString = await this.GetAllValues(ctx, "resource");
 		const resources = JSON.parse(resourcesString);
 
 		resources.sort((a, b) => a.price - b.price);
@@ -106,34 +108,100 @@ class AuctionControl extends Contract {
 		return JSON.stringify(resources);
 	}
 
-	async UpdateResource(ctx, id, volume, price, type) {
-		const exists = await this.ResourceExists(ctx, id);
+	async DeleteKey(ctx, id) {
+		const exists = await this.KeyExists(ctx, id);
 		if (!exists) {
-			throw Error(`No resource exists with id: ${id}`);
-		}
-
-		const resource = {
-			id: id,
-			volume: parseFloat(volume),
-			price: parseFloat(price),
-			type: type,
-		};
-
-		await ctx.stub.putState(
-			resource.id,
-			Buffer(stringify(sortKeysRecursive(resource)))
-		);
-
-		return JSON.stringify(resource);
-	}
-
-	async DeleteResource(ctx, id) {
-		const exists = await this.ResourceExists(ctx, id);
-		if (!exists) {
-			throw Error(`No resource exists with id: ${id}`);
+			throw Error(`No value exists for key: ${id}`);
 		}
 
 		await ctx.stub.deleteState(id);
+	}
+
+	async CreateBid(ctx, id, resource_id, price) {
+		const exists = await this.KeyExists(ctx, id);
+		if (exists) {
+			throw Error(`A bid already exists with id ${id}`);
+		}
+
+		const bid = {
+			id: `bid_${id}`,
+			resource_id: resource_id,
+			price: parseFloat(price),
+		};
+
+		await ctx.stub.putState(
+			bid.id,
+			Buffer.from(stringify(sortKeysRecursive(bid)))
+		);
+		return JSON.stringify(bid);
+	}
+
+	async GetAllBids(ctx, resource_id) {
+		const allResults = [];
+		const iterator = await ctx.stub.getStateByRange("", "");
+		let result = await iterator.next();
+		while (!result.done) {
+			const strValue = Buffer.from(
+				result.value.value.toString()
+			).toString("utf8");
+			let record;
+			try {
+				record = JSON.parse(strValue);
+			} catch (err) {
+				console.log(err);
+				record = strValue;
+			}
+			if (
+				record.id.startsWith(`bid_`) &&
+				record.resource_id === resource_id
+			) {
+				allResults.push(record);
+			}
+			result = await iterator.next();
+		}
+		return JSON.stringify(allResults);
+	}
+
+	async EndEnglishAuction(ctx, resource_id) {
+		const bidsString = await this.GetAllBids(ctx, resource_id);
+		let bids = JSON.parse(bidsString);
+
+		bids.sort((a, b) => b.price - a.price);
+		const buyer_bid = bids[0];
+		const resourceString = await this.TransferResource(
+			ctx,
+			resource_id,
+			buyer_bid.id
+		);
+		return resourceString;
+	}
+
+	async EndSecondPriceAuction(ctx, resource_id) {
+		const bidsString = await this.GetAllBids(ctx, resource_id);
+		let bids = JSON.parse(bidsString);
+
+		bids.sort((a, b) => b.price - a.price);
+		const buyer_bid = bids[1];
+		const resourceString = await this.TransferResource(
+			ctx,
+			resource_id,
+			buyer_bid.id
+		);
+		return resourceString;
+	}
+
+	async TransferResource(ctx, resource_id, bid_id) {
+		const resourceString = await this.ReadKey(ctx, resource_id);
+		const resource = JSON.parse(resourceString);
+		const bidString = await this.ReadKey(ctx, bid_id);
+		const bid = JSON.parse(bidString);
+		resource.buyer_bid_id = bid.id;
+		resource.sold_price = bid.price;
+		await ctx.stub.putState(
+			resource.id,
+			Buffer.from(stringify(sortKeysRecursive(resource)))
+		);
+		return JSON.stringify(resource);
 	}
 }
 

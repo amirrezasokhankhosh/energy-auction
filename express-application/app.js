@@ -125,13 +125,17 @@ async function InitConnection(channelName, chaincodeName) {
 	return network.getContract(chaincodeName);
 }
 
-app.get('/', (req, res) => {
-    res.send("Hello World!.");
+app.get("/", (req, res) => {
+	res.send("Hello World!.");
 });
 
-app.get('/exit', (req, res) => {
-    process.exit();
+app.get("/exit", (req, res) => {
+	process.exit();
 });
+
+/*
+	Resource API
+*/
 
 app.post("/api/resources/", async (req, res) => {
 	const message = await auctionApp.initResources(contractAuction);
@@ -139,46 +143,83 @@ app.post("/api/resources/", async (req, res) => {
 });
 
 app.post("/api/resource/", jsonParser, async (req, res) => {
-	const message = await auctionApp.createResoure(
+	const message = await auctionApp.createResource(
 		contractAuction,
 		req.body.id,
 		req.body.volume.toString(),
 		req.body.price.toString(),
 		req.body.type
 	);
-    res.send(message);
+	res.send(message);
 });
 
-app.get("/api/resource", jsonParser, async (req, res) => {
-    const message = await auctionApp.readResource(contractAuction, req.body.id);
-    res.send(message);
+app.get("/api/resource/", jsonParser, async (req, res) => {
+	const message = await auctionApp.readKey(contractAuction, req.body.id);
+	res.send(message);
 });
 
-app.get("/api/resources", jsonParser, async (req, res) => {
-    const message = await auctionApp.getAllResources(contractAuction);
-    res.send(message);
+app.get("/api/resources/", jsonParser, async (req, res) => {
+	const message = await auctionApp.getAllValues(contractAuction, "resource");
+	res.send(message);
 });
 
 app.get("/api/resources/sorted/", jsonParser, async (req, res) => {
-    const message = await auctionApp.sortResources(contractAuction);
-    res.send(message);
-});
-
-app.put("/api/resource/", jsonParser, async (req, res) => {
-    const message = await auctionApp.updateResource(
-		contractAuction,
-		req.body.id,
-		req.body.volume.toString(),
-		req.body.price.toString(),
-		req.body.type
-	);
-    res.send(message);
+	const message = await auctionApp.sortResources(contractAuction);
+	res.send(message);
 });
 
 app.delete("/api/resource/", jsonParser, async (req, res) => {
-    const message = await auctionApp.deleteResource(contractAuction, id);
-    res.send(message);
+	const message = await auctionApp.deleteKey(contractAuction, req.body.id);
+	res.send(message);
 });
+
+/*
+	Bid API
+*/
+app.post("/api/bid/", jsonParser, async (req, res) => {
+	const message = await auctionApp.createBid(
+		contractAuction,
+		req.body.id,
+		req.body.resource_id,
+		req.body.price.toString()
+	);
+	res.send(message);
+});
+
+app.get("/api/bid/", jsonParser, async (req, res) => {
+	const message = await auctionApp.readKey(contractAuction, req.body.id);
+	res.send(message);
+});
+
+app.get("/api/bids/", jsonParser, async (req, res) => {
+	const message = await auctionApp.getAllBids(
+		contractAuction,
+		req.body.resource_id
+	);
+	res.send(message);
+});
+
+app.delete("/api/bid/", jsonParser, async (req, res) => {
+	const message = await auctionApp.deleteKey(contractAuction, req.body.id);
+	res.send(message);
+});
+
+app.post("/api/auction/english/", jsonParser, async (req, res) => {
+	const message = await auctionApp.endEnglishAuction(
+		contractAuction,
+		req.body.id
+	);
+	res.send(message);
+});
+
+app.post("/api/auction/secondPrice/", jsonParser, async (req, res) => {
+	const message = await auctionApp.endSecondPriceAuction(
+		contractAuction,
+		req.body.id
+	);
+	res.send(message);
+});
+
 
 app.listen(port, () => {
 	console.log(`Server is listening on localhost:${port}.\n`);

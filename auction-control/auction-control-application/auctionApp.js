@@ -30,11 +30,11 @@ class AuctionApp {
 		}
 	}
 
-	async readResource(contract, id) {
+	async readKey(contract, id) {
 		try {
 			const resourceBytes = await (
 				await contract
-			).evaluateTransaction("ReadResource", id);
+			).evaluateTransaction("ReadKey", id);
 			const resourceString = this.utf8decoder.decode(resourceBytes);
 			return JSON.parse(resourceString);
 		} catch (error) {
@@ -43,11 +43,11 @@ class AuctionApp {
 		}
 	}
 
-	async getAllResources(contract) {
+	async getAllValues(contract, value_type) {
 		try {
 			const resourcesBytes = await (
 				await contract
-			).evaluateTransaction("GetAllResources");
+			).evaluateTransaction("GetAllValues", value_type);
 			const resourcesString = this.utf8decoder.decode(resourcesBytes);
 			return JSON.parse(resourcesString);
 		} catch (error) {
@@ -69,24 +69,55 @@ class AuctionApp {
 		}
 	}
 
-	async updateResource(contract, id, volume, price, type) {
+	async deleteKey(contract, id) {
 		try {
-			const resourceBytes = await (
-				await contract
-			).submitTransaction("UpdateResource", id, volume, price, type);
-			const resourceString = this.utf8decoder.decode(resourceBytes);
-			return JSON.parse(resourceString);
+			await (await contract).submitTransaction("DeleteKey", id);
+			return "Resource was successfully deleted.";
 		} catch (error) {
 			console.log(error);
 			return error;
 		}
 	}
 
-	async deleteResource(contract, id) {
+	async createBid(contract, id, resource_id, price) {
 		try {
-			await (await contract).submitTransaction("DeleteResource", id);
-			return "Resource was successfully deleted.";
-		} catch (error) {
+			const bidBytes = await (await contract).submitTransaction("CreateBid", id, resource_id, price);
+			const bidString = this.utf8decoder.decode(bidBytes);
+			return JSON.stringify(bidString);
+		} catch(error) {
+			console.log(error);
+			return error;
+		}
+	}
+
+	async getAllBids(contract, resource_id) {
+		try {
+			const bidsBytes = await (await contract).evaluateTransaction("GetAllBids", resource_id);
+			const bidsString = this.utf8decoder.decode(bidsBytes);
+			return JSON.stringify(bidsString);
+		} catch(error) {
+			console.log(error);
+			return error;
+		}
+	}
+
+	async endEnglishAuction(contract, resource_id) {
+		try {
+			const resourceBytes = await (await contract).submitTransaction("EndEnglishAuction", resource_id);
+			const resourceString = this.utf8decoder.decode(resourceBytes);
+			return JSON.stringify(resourceString);
+		} catch(error) {
+			console.log(error);
+			return error;
+		}
+	}
+
+	async endSecondPriceAuction(contract, resource_id) {
+		try {
+			const resourceBytes = await (await contract).submitTransaction("EndSecondPriceAuction", resource_id);
+			const resourceString = this.utf8decoder.decode(resourceBytes);
+			return JSON.stringify(resourceString);
+		} catch(error) {
 			console.log(error);
 			return error;
 		}
