@@ -4,7 +4,8 @@ from tqdm import tqdm
 import random
 import requests
 import subprocess
-
+import numpy as np
+import matplotlib.pyplot as plt
 
 def run_network(ext=""):
     cwd = os.path.dirname(__file__)
@@ -45,9 +46,9 @@ def create_resources(num_resources):
 def create_bids(num_resources, num_bids):
     for i in tqdm(range(num_resources)):
         for j in range(num_bids):
-            requests.post("http://localhost:3000/api/bid/",
+            res = requests.post("http://localhost:3000/api/bid/",
                           json={
-                              "id": f"bid_{j}",
+                              "id": f"{i*num_bids + j}",
                               "resource_id": f"resource_{i}",
                               "price": random.randint(100, 500)
                           })
@@ -87,8 +88,8 @@ def evaluate_network(num_resources, num_bids):
 
 
 if __name__ == "__main__":
-    num_resources = 100
-    num_bids = 10
+    num_resources = 10
+    num_bids = 100
 
     print("Running non-optimized network.")
     run_network()
@@ -102,3 +103,23 @@ if __name__ == "__main__":
 
     print(stats)
     print(opt_stats)
+
+    labels = list(stats.keys())
+    non_opt_values = [stats[key] for key in labels]
+    opt_values = [opt_stats[key] for key in labels]
+
+    x = np.arange(len(labels))
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    bars1 = ax.bar(x - width/2, non_opt_values, width, label='Non-Optimized', color='red', alpha=0.7)
+    bars2 = ax.bar(x + width/2, opt_values, width, label='Optimized', color='green', alpha=0.7)
+
+    ax.set_xlabel('Operation')
+    ax.set_ylabel('Time per Operation (s)')
+    ax.set_title('Optimized vs Non-Optimized Network Performance')
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.legend()
+
+    plt.savefig("./network_performance_comparison.png", dpi=300, bbox_inches="tight")
